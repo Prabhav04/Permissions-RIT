@@ -2,7 +2,7 @@
 
 A dedicated web application for students of **Rajiv Gandhi Institute of Technology (RIT), Kottayam** to effortlessly generate, format, and export official permission letters.
 
-![Permissions RIT Banner](public/Permissions-RIT.png)
+![Permissions RIT Banner](public/Permissions-RIT1.png)
 _(Note: You can add a screenshot of your app here)_
 
 ## 🚀 Overview
