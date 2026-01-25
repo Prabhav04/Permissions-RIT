@@ -1,65 +1,178 @@
-import Image from "next/image";
+"use client";
+
+import React, { useState, useEffect, Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
+import LetterCanvas from '@/components/LetterCanvas';
+import FormattingToolbar from '@/components/FormattingToolbar';
+import PDFExporter from '@/components/PDFExporter';
+import Sidebar from '@/components/Sidebar';
+import { Menu } from 'lucide-react';
+import { templates } from '@/lib/templates';
+import Link from 'next/link';
+import { motion } from 'framer-motion';
+
+import { useRef } from 'react';
+import { User, Save } from 'lucide-react';
+import { useUserProfile } from '@/hooks/useUserProfile';
+import ProfileModal from '@/components/ProfileModal';
+
+function EditorContent() {
+  const searchParams = useSearchParams();
+  const templateId = searchParams.get('template');
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const { profile, saveProfile } = useUserProfile();
+  const [lastSaved, setLastSaved] = useState<Date | null>(null);
+  
+  // Ref to track if internal content update is happening to avoid auto-save triggering improperly on load
+  const isInitializing = useRef(true);
+
+  const [content, setContent] = useState<string>(`
+    <p><strong>To,</strong></p>
+    <p>The Principal,</p>
+    <p>Rajiv Gandhi Institute of Technology,</p>
+    <p>Kottayam.</p>
+    <br/>
+    <p><strong>Subject: Request for Permission...</strong></p>
+    <br/>
+    <p>Respected Sir/Madam,</p>
+    <p>I am writing to request permission for...</p>
+    <br/>
+    <p>Thanking You,</p>
+    <p>Yours Faithfully,</p>
+    <p>[Your Name]</p>
+  `);
+
+  // Auto-Fill Function
+  const autoFillProfile = (text: string) => {
+    if (!profile) return text;
+    return text
+      .replace(/\[Your Name\]/g, profile.name)
+      .replace(/\[Roll Number\]/g, profile.rollNumber)
+      .replace(/\[Department\]/g, profile.department)
+      .replace(/\[Representative Name\]/g, profile.name)
+      .replace(/\[Class Representative\]/g, `${profile.rollNumber} - ${profile.department}`);
+  };
+
+  // Load Draft on Startup
+  useEffect(() => {
+    const savedDraft = localStorage.getItem('rit-permissions-draft');
+    if (savedDraft) {
+        setContent(savedDraft);
+        setLastSaved(new Date());
+    }
+    // Set initializing to false after initial check logic
+    setTimeout(() => { isInitializing.current = false; }, 500);
+  }, []);
+
+  // Auto-Save Effect
+  useEffect(() => {
+    if (isInitializing.current) return;
+
+    const timer = setTimeout(() => {
+        localStorage.setItem('rit-permissions-draft', content);
+        setLastSaved(new Date());
+    }, 1000); // Debounce save every 1s of inactivity
+
+    return () => clearTimeout(timer);
+  }, [content]);
+
+  // Handle Template Selection with Auto-Fill
+  useEffect(() => {
+    if (templateId) {
+      const template = templates.find(t => t.id === templateId);
+      if (template) {
+        const filledContent = autoFillProfile(template.content);
+        setContent(filledContent);
+      }
+    }
+  }, [templateId, profile]); // Re-run if profile changes too
+
+  const handleTemplateSelect = (templateContent: string) => {
+    setContent(autoFillProfile(templateContent));
+  };
+
+  return (
+    <div className="min-h-screen bg-[linear-gradient(to_bottom,_#02183D,_#2B476C)] flex flex-col relative text-gray-900">
+      <Sidebar 
+        isOpen={isSidebarOpen} 
+        onClose={() => setIsSidebarOpen(false)} 
+        onSelectTemplate={handleTemplateSelect} 
+      />
+
+      <ProfileModal 
+        isOpen={isProfileOpen} 
+        onClose={() => setIsProfileOpen(false)}
+        initialProfile={profile}
+        onSave={saveProfile}
+      />
+
+      {/* Header / Toolbar Area */}
+      <header className="sticky top-0 z-30 bg-white border-b border-gray-200 no-print shadow-sm">
+        <div className="max-w-7xl mx-auto px-2 sm:px-6 lg:px-8 ">
+          <div className="flex justify-between items-center h-16">
+            <div className="flex items-center gap-4">
+              <button 
+                onClick={() => setIsSidebarOpen(true)}
+                className="p-2 rounded-lg hover:bg-gray-100 text-gray-600 hover:text-rit-primary transition-colors"
+                title="Open Templates"
+              >
+                <Menu size={24} />
+              </button>
+              <h1 className="text-lg font-bold text-gray-900 hidden sm:block">
+                Permissions <span className="text-rit-primary">RIT</span>
+              </h1>
+            </div>
+            
+            <div className="flex items-center gap-3 ">
+               {lastSaved && (
+                   <span className="text-xs text-gray-400 hidden md:block flex items-center gap-1">
+                       <Save size={12} />
+                       Saved
+                   </span>
+               )}
+               <button
+                  onClick={() => setIsProfileOpen(true)}
+                  className="p-2 rounded-lg bg-gray-50 hover:bg-gray-100 text-gray-600 border border-gray-200 transition-all flex items-center gap-2"
+                  title="Student Profile"
+               >
+                  <User size={18} />
+                  <span className="text-sm font-medium hidden md:inline">
+                      {profile ? profile.name.split(' ')[0] : 'Profile'}
+                  </span>
+               </button>
+               <PDFExporter />
+            </div>
+          </div>
+        </div>
+      </header>
+
+      {/* Floating Toolbar Container */}
+      <div className="sticky top-20 z-20 flex justify-center px-4 mb-4 pointer-events-none no-print">
+         <div className="pointer-events-auto shadow-sm bg-white rounded-lg">
+           <FormattingToolbar />
+         </div>
+      </div>
+
+      {/* Main Content Area */}
+      <main className="flex-1 overflow-auto p-4 md:p-8 relative z-10">
+        <motion.div 
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4 }}
+          className="max-w-[210mm] mx-auto pb-2 md:pb-20"
+        >
+           <LetterCanvas content={content} setContent={setContent} />
+        </motion.div>
+      </main>
+    </div>
+  );
+}
 
 export default function Home() {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
-    </div>
+    <Suspense fallback={<div className="flex items-center justify-center min-h-screen">Loading...</div>}>
+      <EditorContent />
+    </Suspense>
   );
 }
