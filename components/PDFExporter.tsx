@@ -9,8 +9,8 @@ const PDFExporter = () => {
   const [isGenerating, setIsGenerating] = useState(false);
 
   const generatePDF = async () => {
-    const element = document.getElementById('letter-canvas');
-    if (!element) {
+    const originalElement = document.getElementById('letter-canvas');
+    if (!originalElement) {
       alert('Could not find letter content');
       return;
     }
@@ -18,23 +18,62 @@ const PDFExporter = () => {
     setIsGenerating(true);
 
     try {
-      // Use higher scale for better quality
-      const canvas = await html2canvas(element, {
+      // 1. Create a clone to render at 100% scale (A4) purely for capture
+      // This alleviates issues with mobile scaling, transforms, or screen-specific layout quirks
+      const clone = originalElement.cloneNode(true) as HTMLElement;
+      
+      // 2. Setup a temporary container off-screen
+      const container = document.createElement('div');
+      container.style.position = 'fixed';
+      container.style.top = '-10000px';
+      container.style.left = '-10000px';
+      container.style.zIndex = '-1000';
+      // Force A4 width/layout context
+      container.style.width = '210mm'; 
+      container.style.minHeight = '297mm';
+      
+      // Append clone to container
+      container.appendChild(clone);
+      document.body.appendChild(container);
+
+      // 3. Capture the clone
+      // scale: 2 provides 2x resolution (good for retina/print), significantly better than default
+      const canvas = await html2canvas(clone, {
         scale: 2,
         useCORS: true,
         logging: false,
-        backgroundColor: '#ffffff'
+        backgroundColor: '#ffffff',
+        // Fix for some font rendering issues
+        onclone: (clonedDoc) => {
+            // The cloned element is the root of the clone, which IS 'letter-canvas'
+            // We just need to make sure we are styling the root container we appended
+            if (clone) {
+                clone.style.margin = '0 auto';
+                clone.style.boxShadow = 'none';
+                clone.style.transform = 'none'; 
+            }
+        }
       });
 
+      // 4. Generate PDF
       const imgData = canvas.toDataURL('image/png');
-      
-      // A4 dimensions in mm
       const pdf = new jsPDF('p', 'mm', 'a4');
       const pdfWidth = pdf.internal.pageSize.getWidth();
       const pdfHeight = pdf.internal.pageSize.getHeight();
       
-      pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+      // Calculate height ratio to prevent stretching if content is shorter than A4
+      const imgProps = pdf.getImageProperties(imgData);
+      const ratio = imgProps.width / imgProps.height;
+      const calculatedHeight = pdfWidth / ratio;
+
+      // Only stretch if it's very close to A4, otherwise keep aspect ratio
+      // But for this use-case (A4 letter), usually fitting to width is best.
+      pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, calculatedHeight);
       pdf.save('permission-letter.pdf');
+
+      // 5. Cleanup
+      document.body.removeChild(container);
+
     } catch (error) {
       console.error('Error generating PDF:', error);
       alert('Failed to generate PDF. Please try again.');
