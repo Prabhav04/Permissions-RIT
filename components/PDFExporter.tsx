@@ -56,7 +56,10 @@ const PDFExporter = () => {
       });
 
       // 4. Generate PDF
-      const imgData = canvas.toDataURL('image/png');
+      // Use JPEG instead of PNG to drastically reduce file size (10MB -> ~500KB)
+      const quality = 0.75; // 0.75 offers good compromise between text sharpness and size
+      const imgData = canvas.toDataURL('image/jpeg', quality);
+      
       const pdf = new jsPDF('p', 'mm', 'a4');
       const pdfWidth = pdf.internal.pageSize.getWidth();
       const pdfHeight = pdf.internal.pageSize.getHeight();
@@ -68,7 +71,7 @@ const PDFExporter = () => {
 
       // Only stretch if it's very close to A4, otherwise keep aspect ratio
       // But for this use-case (A4 letter), usually fitting to width is best.
-      pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, calculatedHeight);
+      pdf.addImage(imgData, 'JPEG', 0, 0, pdfWidth, calculatedHeight);
       pdf.save('permission-letter.pdf');
 
       // 5. Cleanup
