@@ -12,9 +12,18 @@ import Link from 'next/link';
 import { motion } from 'framer-motion';
 
 import { useRef } from 'react';
-import { User, Save } from 'lucide-react';
+import { User, Save, FolderOpen } from 'lucide-react';
 import { useUserProfile } from '@/hooks/useUserProfile';
 import ProfileModal from '@/components/ProfileModal';
+import ConfirmDialog from '@/components/ConfirmDialog';
+import InputDialog from '@/components/InputDialog';
+
+export interface RecentWork {
+  id: string;
+  name: string;
+  content: string;
+  lastModified: number;
+}
 
 function EditorContent() {
   const searchParams = useSearchParams();
@@ -23,6 +32,33 @@ function EditorContent() {
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const { profile, saveProfile } = useUserProfile();
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
+  const [recentWorks, setRecentWorks] = useState<RecentWork[]>([]);
+  
+  // Dialog States
+  const [confirmDialog, setConfirmDialog] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    onConfirm: () => void;
+    isDestructive?: boolean;
+  }>({
+    isOpen: false,
+    title: "",
+    message: "",
+    onConfirm: () => {},
+  });
+
+  const [inputDialog, setInputDialog] = useState<{
+    isOpen: boolean;
+    title: string;
+    defaultValue: string;
+    onConfirm: (val: string) => void;
+  }>({
+    isOpen: false,
+    title: "",
+    defaultValue: "",
+    onConfirm: () => {},
+  });
   
   // Ref to track if internal content update is happening to avoid auto-save triggering improperly on load
   const isInitializing = useRef(true);
@@ -54,16 +90,76 @@ function EditorContent() {
       .replace(/\[Class Representative\]/g, `${profile.rollNumber} - ${profile.department}`);
   };
 
-  // Load Draft on Startup
+  // Load Draft and Recent Works on Startup
   useEffect(() => {
     const savedDraft = localStorage.getItem('rit-permissions-draft');
     if (savedDraft) {
         setContent(savedDraft);
         setLastSaved(new Date());
     }
+
+    const savedWorks = localStorage.getItem('rit-permissions-recent-works');
+    if (savedWorks) {
+      try {
+        setRecentWorks(JSON.parse(savedWorks));
+      } catch (e) {
+        console.error("Failed to parse recent works", e);
+      }
+    }
+
     // Set initializing to false after initial check logic
     setTimeout(() => { isInitializing.current = false; }, 500);
   }, []);
+
+  // Save Recent Works to LocalStorage
+  useEffect(() => {
+    localStorage.setItem('rit-permissions-recent-works', JSON.stringify(recentWorks));
+  }, [recentWorks]);
+
+  const saveToRecent = () => {
+    setInputDialog({
+      isOpen: true,
+      title: "Save Letter",
+      defaultValue: "Untitled Letter",
+      onConfirm: (name) => {
+        const newWork: RecentWork = {
+          id: crypto.randomUUID(),
+          name,
+          content,
+          lastModified: Date.now(),
+        };
+        setRecentWorks(prev => [newWork, ...prev]);
+        
+        // Show success confirmation (optional, or just a toast)
+        // For now, let's just stick to the visual update in sidebar
+      }
+    });
+  };
+
+  const loadRecentWork = (work: RecentWork) => {
+    setConfirmDialog({
+      isOpen: true,
+      title: "Load Letter?",
+      message: "This will overwrite your current unsaved changes. Are you sure you want to load this letter?",
+      isDestructive: true,
+      onConfirm: () => {
+        setContent(work.content);
+        setIsSidebarOpen(false);
+      },
+    });
+  };
+
+  const deleteRecentWork = (id: string) => {
+    setConfirmDialog({
+      isOpen: true,
+      title: "Delete Letter?",
+      message: "This action cannot be undone. Are you sure you want to delete this saved letter?",
+      isDestructive: true,
+      onConfirm: () => {
+        setRecentWorks(prev => prev.filter(w => w.id !== id));
+      }
+    });
+  };
 
   // Auto-Save Effect
   useEffect(() => {
@@ -125,7 +221,10 @@ function EditorContent() {
       <Sidebar 
         isOpen={isSidebarOpen} 
         onClose={() => setIsSidebarOpen(false)} 
-        onSelectTemplate={handleTemplateSelect} 
+        onSelectTemplate={handleTemplateSelect}
+        recentWorks={recentWorks}
+        onSelectRecentWork={loadRecentWork}
+        onDeleteRecentWork={deleteRecentWork}
       />
 
       <ProfileModal 
@@ -133,6 +232,24 @@ function EditorContent() {
         onClose={() => setIsProfileOpen(false)}
         initialProfile={profile}
         onSave={saveProfile}
+      />
+
+      <ConfirmDialog
+        isOpen={confirmDialog.isOpen}
+        onClose={() => setConfirmDialog(prev => ({ ...prev, isOpen: false }))}
+        onConfirm={confirmDialog.onConfirm}
+        title={confirmDialog.title}
+        message={confirmDialog.message}
+        isDestructive={confirmDialog.isDestructive}
+      />
+
+      <InputDialog
+        isOpen={inputDialog.isOpen}
+        onClose={() => setInputDialog(prev => ({ ...prev, isOpen: false }))}
+        onConfirm={inputDialog.onConfirm}
+        title={inputDialog.title}
+        defaultValue={inputDialog.defaultValue}
+        placeholder="Enter letter name..."
       />
 
       {/* Header / Toolbar Area */}
@@ -175,6 +292,14 @@ function EditorContent() {
                        Saved
                    </span>
                )}
+               <button
+                  onClick={saveToRecent}
+                  className="p-2 rounded-lg bg-rit-primary text-white hover:bg-rit-dark transition-all flex items-center gap-2 shadow-sm"
+                  title="Save to Recent Works"
+               >
+                  <FolderOpen size={18} />
+                  <span className="text-sm font-medium hidden md:inline">Save</span>
+               </button>
                <button
                   onClick={() => setIsProfileOpen(true)}
                   className="p-2 rounded-lg bg-gray-50 hover:bg-gray-100 text-gray-600 border border-gray-200 transition-all flex items-center gap-2"

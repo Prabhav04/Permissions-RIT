@@ -2,6 +2,7 @@
 
 import React, { useRef, useEffect } from 'react';
 import { clsx } from 'clsx';
+import ClientDate from './ClientDate';
 
 interface LetterCanvasProps {
   content: string;
@@ -77,7 +78,7 @@ const LetterCanvas: React.FC<LetterCanvasProps> = ({ content, setContent, readOn
                 suppressContentEditableWarning
                 className="outline-none border-none min-w-[100px] text-right"
             >
-                Date: {new Date().toLocaleDateString('en-GB')}
+                Date: <ClientDate />
             </div>
             </div>
 
