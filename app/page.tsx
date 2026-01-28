@@ -211,6 +211,24 @@ function EditorContent() {
     }
   }, []);
 
+  useEffect(() => {
+    // Check for first-time user profile
+    // We check localStorage directly to avoid waiting for hook state synchronization issues on mount
+    const hasProfile = localStorage.getItem('rit-permissions-profile');
+    const hasSkipped = localStorage.getItem('rit-permissions-profile-skipped');
+    
+    if (!hasProfile && !hasSkipped) {
+       // Small delay for better UX
+       const timer = setTimeout(() => setIsProfileOpen(true), 1000);
+       return () => clearTimeout(timer);
+    }
+  }, []);
+
+  const handleSkipProfile = () => {
+      localStorage.setItem('rit-permissions-profile-skipped', 'true');
+      setIsProfileOpen(false);
+  };
+
   const dismissHint = () => {
     setShowMenuHint(false);
     sessionStorage.setItem('hasSeenMenuHint', 'true');
@@ -232,6 +250,7 @@ function EditorContent() {
         onClose={() => setIsProfileOpen(false)}
         initialProfile={profile}
         onSave={saveProfile}
+        onSkip={!profile ? handleSkipProfile : undefined}
       />
 
       <ConfirmDialog

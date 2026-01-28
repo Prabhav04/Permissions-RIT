@@ -10,6 +10,7 @@ interface ProfileModalProps {
   onClose: () => void;
   initialProfile: UserProfile | null;
   onSave: (profile: UserProfile) => void;
+  onSkip?: () => void;
 }
 
 const DEPARTMENTS = [
@@ -22,7 +23,7 @@ const DEPARTMENTS = [
   "MCA"
 ];
 
-const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose, initialProfile, onSave }) => {
+const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose, initialProfile, onSave, onSkip }) => {
   const [formData, setFormData] = useState<UserProfile>({
     name: '',
     rollNumber: '',
@@ -144,6 +145,15 @@ const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose, initialPro
                     <Check size={18} />
                     Save Profile
                   </button>
+                  {onSkip && (
+                    <button
+                      type="button"
+                      onClick={onSkip}
+                      className="w-full py-2 text-sm text-gray-500 hover:text-gray-700 font-medium transition-colors"
+                    >
+                      Skip for now
+                    </button>
+                  )}
                 </div>
               </form>
             </motion.div>
