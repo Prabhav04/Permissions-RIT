@@ -16,6 +16,7 @@ import { User, Save, FolderOpen } from 'lucide-react';
 import { useUserProfile } from '@/hooks/useUserProfile';
 import ProfileModal from '@/components/ProfileModal';
 import ConfirmDialog from '@/components/ConfirmDialog';
+import VisitorBadge from '@/components/VisitorBadge';
 import InputDialog from '@/components/InputDialog';
 
 export interface RecentWork {
@@ -305,6 +306,7 @@ function EditorContent() {
             </div>
             
             <div className="flex items-center gap-3 ">
+               <VisitorBadge />
                {lastSaved && (
                    <span className="text-xs text-gray-400 hidden md:block flex items-center gap-1">
                        <Save size={12} />
